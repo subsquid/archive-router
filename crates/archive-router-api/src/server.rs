@@ -33,7 +33,7 @@ async fn get_worker<S: DatasetStorage>(
     Extension(router): Extension<Arc<Mutex<ArchiveRouter<S>>>>,
 ) -> Result<Json<Url>> {
     let router = router.lock().unwrap();
-    let url = router.get_worker(start_block)?.clone();
+    let url = router.get_worker(start_block).await?.clone();
     Ok(Json(url))
 }
 
@@ -41,7 +41,7 @@ async fn get_dataset_range<S: DatasetStorage>(
     Extension(router): Extension<Arc<Mutex<ArchiveRouter<S>>>>,
 ) -> Result<Json<DataRange>> {
     let router = router.lock().unwrap();
-    let range = router.get_dataset_range()?;
+    let range = router.get_dataset_range().await?;
     Ok(Json(range))
 }
 

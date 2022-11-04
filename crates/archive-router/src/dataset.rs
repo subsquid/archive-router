@@ -12,9 +12,10 @@ pub struct DataDir {
     pub size: u64,
 }
 
+#[async_trait::async_trait]
 pub trait DatasetStorage {
     /// Get data directories in the dataset.
-    fn get_data_directories(&self, dataset: &str) -> Result<Vec<DataDir>, Error>;
+    async fn get_data_directories(&self, dataset: &str) -> Result<Vec<DataDir>, Error>;
 }
 
 fn dir_size(dir: &fs::DirEntry) -> io::Result<u64> {
@@ -26,8 +27,9 @@ fn dir_size(dir: &fs::DirEntry) -> io::Result<u64> {
 
 pub struct LocalDatasetStorage;
 
+#[async_trait::async_trait]
 impl DatasetStorage for LocalDatasetStorage {
-    fn get_data_directories(&self, dataset: &str) -> Result<Vec<DataDir>, Error> {
+    async fn get_data_directories(&self, dataset: &str) -> Result<Vec<DataDir>, Error> {
         let mut dirs = vec![];
         let dataset_dir = fs::read_dir(dataset)?;
         for subfolder in dataset_dir {

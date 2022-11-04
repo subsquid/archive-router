@@ -78,8 +78,8 @@ impl<S: DatasetStorage> ArchiveRouter<S> {
         &worker.desired_state
     }
 
-    pub fn get_worker(&self, start_block: i32) -> Result<&Url, Error> {
-        if !includes(&self.get_dataset_range()?, start_block) {
+    pub async fn get_worker(&self, start_block: i32) -> Result<&Url, Error> {
+        if !includes(&self.get_dataset_range().await?, start_block) {
             return Err(Error::NoRequestedData);
         }
 
@@ -110,8 +110,8 @@ impl<S: DatasetStorage> ArchiveRouter<S> {
         Ok(&worker.url)
     }
 
-    pub fn get_dataset_range(&self) -> Result<DataRange, Error> {
-        let ranges = self.get_data_ranges()?;
+    pub async fn get_dataset_range(&self) -> Result<DataRange, Error> {
+        let ranges = self.get_data_ranges().await?;
 
         if ranges.is_empty() {
             return Ok(DataRange { from: -1, to: -1 });
@@ -124,14 +124,14 @@ impl<S: DatasetStorage> ArchiveRouter<S> {
     }
 
     /// Distributes data ranges among available workers
-    pub fn schedule(&mut self) -> Result<(), Error> {
+    pub async fn schedule(&mut self) -> Result<(), Error> {
         let now = SystemTime::now();
 
         // remove dead workers
         self.workers
             .retain(|w| now.duration_since(w.last_ping).unwrap() < Duration::from_secs(10 * 60));
 
-        let ranges = self.get_data_ranges()?;
+        let ranges = self.get_data_ranges().await?;
 
         // remove dead ranges from desired state
         for w in &mut self.workers {
@@ -205,8 +205,8 @@ impl<S: DatasetStorage> ArchiveRouter<S> {
     The resulting ranges are sorted and guaranteed to cover continues range of blocks
     starting from block 0.
     */
-    pub fn get_data_ranges(&self) -> Result<Vec<DataRange>, Error> {
-        let mut dirs = self.storage.get_data_directories(&self.dataset)?;
+    pub async fn get_data_ranges(&self) -> Result<Vec<DataRange>, Error> {
+        let mut dirs = self.storage.get_data_directories(&self.dataset).await?;
         dirs.sort_by_key(|dir| dir.from);
         let mut ranges = vec![];
 
