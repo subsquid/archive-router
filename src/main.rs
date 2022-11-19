@@ -1,3 +1,5 @@
+extern crate core;
+
 mod api;
 mod fs;
 mod interval;
@@ -7,5 +9,5 @@ mod util;
 
 #[tokio::main]
 async fn main() {
-    print!("Hello world!");
+    println!("Hello world!");
 }

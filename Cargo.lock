@@ -1388,6 +1388,7 @@ dependencies = [
  "blake3",
  "clap",
  "hyper",
+ "parking_lot",
  "rand",
  "serde",
  "tokio",

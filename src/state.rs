@@ -5,14 +5,22 @@ use std::time::SystemTime;
 use crate::interval::Interval;
 use crate::util::Atom;
 
-pub type WorkerId = u128;
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub struct WorkerId([u8; 32]);
+
+
+impl From<&str> for WorkerId {
+    fn from(s: &str) -> Self {
+        WorkerId(blake3::hash(s.as_bytes()).into())
+    }
+}
 
 
 #[derive(Clone)]
 struct Worker {
     worker_id: WorkerId,
     state: Atom<WorkerState>,
-    desired_ranges: Atom<Box<[Interval]>>
+    desired_ranges: Atom<[Interval]>
 }
 
 
@@ -39,13 +47,13 @@ pub struct PingMessageWorkerState {
 
 pub struct PingResponse {
     dataset: Arc<str>,
-    ranges: Arc<Box<[Interval]>>
+    ranges: Arc<[Interval]>
 }
 
 
 pub struct StateManager {
     dataset: Arc<str>,
-    workers: Atom<Box<[Worker]>>,
+    workers: Atom<[Worker]>,
     intervals: Mutex<Vec<Interval>>
 }
 
@@ -56,7 +64,7 @@ unsafe impl Sync for StateManager {}
 
 impl StateManager {
     pub fn ping(&self, msg: PingMessage) -> PingResponse {
-        let worker_id = 0u128;
+        let worker_id = WorkerId::from(msg.worker_id.deref());
 
         let state = Arc::new(WorkerState {
             url: msg.worker_url,
@@ -67,7 +75,7 @@ impl StateManager {
             last_ping: SystemTime::now()
         });
 
-        let mut desired_ranges: Option<Arc<Box<[Interval]>>> = None;
+        let mut desired_ranges: Option<Arc<[Interval]>> = None;
 
         self.workers.update(|workers| {
             if let Some(w) = workers.iter().find(|w| w.worker_id == worker_id) {
@@ -75,17 +83,16 @@ impl StateManager {
                 desired_ranges = Some(w.desired_ranges.get());
                 None
             } else {
-                let ranges = Arc::new(state.available_ranges.clone());
+                let ranges = Arc::from_iter(state.available_ranges.iter().cloned());
                 desired_ranges = Some(ranges.clone());
                 let w = Worker {
                     worker_id,
                     state: Atom::new(state.clone()),
                     desired_ranges: Atom::new(ranges)
                 };
-                let mut new_list: Vec<Worker> = Vec::with_capacity(workers.len() + 1);
-                new_list.extend(workers.iter().map(|w| w.clone()));
-                new_list.push(w);
-                Some(Arc::new(new_list.into_boxed_slice()))
+                Some(Arc::from_iter(
+                    workers.iter().cloned().chain(std::iter::once(w))
+                ))
             }
         });
 
