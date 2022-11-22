@@ -29,8 +29,8 @@ impl <T: ?Sized> Atom<T> {
     }
 
     pub fn update<F: FnMut(&T) -> Option<Arc<T>>>(&self, mut f: F) {
-        let initial = self.get();
         loop {
+            let initial = self.get();
             if let Some(new_val) = f(initial.deref()) {
                 let mut lock = self.inner.write();
                 let current = lock.deref_mut();

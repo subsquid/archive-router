@@ -1,5 +1,7 @@
 extern crate core;
 
+use crate::layout::DataChunk;
+
 mod api;
 mod fs;
 mod interval;
@@ -9,5 +11,5 @@ mod util;
 
 #[tokio::main]
 async fn main() {
-    println!("Hello world!");
+    println!("{}", DataChunk::new(0, 0, 1000000));
 }

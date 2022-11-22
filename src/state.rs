@@ -1,10 +1,10 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use crate::interval::{Interval, Range};
+use crate::layout::DataChunk;
 use crate::util::Atom;
-
 
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct WorkerId([u8; 32]);
@@ -21,7 +21,7 @@ impl From<&str> for WorkerId {
 struct Worker {
     worker_id: WorkerId,
     desired_range: Arc<Range>,
-    state: Atom<WorkerState>,
+    state: Arc<Atom<WorkerState>>,
 }
 
 
@@ -65,6 +65,33 @@ unsafe impl Sync for StateManager {}
 
 
 impl StateManager {
+    pub fn update_ranges<F: FnOnce(u32) -> Vec<DataChunk>>(&self, f: F) -> Result<(), String> {
+        let mut lock = self.intervals.lock().unwrap();
+        let mut intervals = lock.deref_mut();
+
+        let first_block = intervals.last().map(|i| i.begin());
+        let mut new_chunks = f(first_block.unwrap_or(0));
+        new_chunks.sort();
+
+        // check, that the chunks are non-overlapping
+        // and span a continuous range
+        let mut last_block = new_chunks.first().map(|c| c.last_block());
+        for i in 1..new_chunks.len() {
+            let p = new_chunks[i-1];
+            let c = new_chunks[i];
+            if p.last_block() >= c.first_block() {
+                return Err(format!("Received overlapping chunks: {} and {}", p, c))
+            }
+            if p.last_block() + 1 == c.first_block() {
+                last_block = Some(c.last_block());
+            } else {
+                break
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn get_worker(&self, first_block: u32) -> Option<Arc<str>> {
         let now = SystemTime::now();
 
@@ -117,7 +144,7 @@ impl StateManager {
                 desired_range = Some(range.clone());
                 let w = Worker {
                     worker_id,
-                    state: Atom::new(state.clone()),
+                    state: Arc::new(Atom::new(state.clone())),
                     desired_range: range
                 };
                 Some(Arc::new(
