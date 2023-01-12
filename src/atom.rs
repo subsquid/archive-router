@@ -4,15 +4,17 @@
 //
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-
 use parking_lot::RwLock;
+
 
 pub struct Atom<T: ?Sized> {
     inner: RwLock<Arc<T>>
 }
 
+
 unsafe impl<T: ?Sized + Send> Send for Atom<T> {}
 unsafe impl<T: ?Sized + Send> Sync for Atom<T> {}
+
 
 impl <T: ?Sized> Atom<T> {
     pub fn new(val: Arc<T>) -> Self {
