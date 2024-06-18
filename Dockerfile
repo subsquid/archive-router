@@ -41,13 +41,13 @@ COPY crates ./crates
 
 RUN --mount=type=ssh cargo build --release --workspace
 
-FROM --platform=$BUILDPLATFORM debian:bookworm-slim as network-base
+FROM --platform=$BUILDPLATFORM ubuntu:latest as network-base
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
     && apt-get update \
-    && apt-get -y install ca-certificates net-tools
+    && apt-get -y install ca-certificates net-tools heaptrack gdb
 
 FROM --platform=$BUILDPLATFORM network-base as network-scheduler
 
