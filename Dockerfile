@@ -47,17 +47,15 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
     && apt-get update \
-    && apt-get -y install ca-certificates net-tools heaptrack gdb
-
-FROM --platform=$BUILDPLATFORM network-base as network-scheduler
-
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean \
-    && apt-get update \
-    && apt-get -y install curl
+    && apt-get -y install ca-certificates net-tools heaptrack gdb curl
 
 WORKDIR /run
+
+RUN curl -L -o bytehound.tgz https://github.com/koute/bytehound/releases/download/0.11.0/bytehound-x86_64-unknown-linux-gnu.tgz \
+    && tar xzf bytehound.tgz
+ENV MEMORY_PROFILER_LOG=warn
+
+FROM --platform=$BUILDPLATFORM network-base as network-scheduler
 
 COPY --from=network-builder /app/target/release/network-scheduler /usr/local/bin/network-scheduler
 COPY --from=network-builder /app/crates/network-scheduler/config.yml .
