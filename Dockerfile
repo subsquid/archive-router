@@ -13,7 +13,9 @@ COPY --from=archive-router-builder /archive-router/target/release/router ./route
 ENTRYPOINT ["/archive-router/router"]
 EXPOSE 3000
 
-FROM --platform=$BUILDPLATFORM lukemathwalker/cargo-chef:0.1.66-rust-1.78-slim-bookworm AS chef
+FROM clux/muslrust:1.78.0-stable AS chef
+USER root
+RUN cargo install cargo-chef
 WORKDIR /app
 
 FROM --platform=$BUILDPLATFORM chef AS network-planner
@@ -32,16 +34,18 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     && apt-get update \
     && apt-get -y install protobuf-compiler pkg-config libssl-dev build-essential
 
+RUN ln -s /bin/g++ /bin/musl-g++
+
 COPY --from=network-planner /app/recipe.json recipe.json
-RUN --mount=type=ssh cargo chef cook --release --recipe-path recipe.json
+RUN --mount=type=ssh cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
 
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY crates ./crates
 
-RUN --mount=type=ssh cargo build --release --workspace
+RUN --mount=type=ssh cargo build --release --target x86_64-unknown-linux-musl --workspace
 
-FROM --platform=$BUILDPLATFORM debian:bookworm-slim as network-base
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS network-base
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
@@ -49,7 +53,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     && apt-get update \
     && apt-get -y install ca-certificates net-tools
 
-FROM --platform=$BUILDPLATFORM network-base as network-scheduler
+FROM --platform=$BUILDPLATFORM network-base AS network-scheduler
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
@@ -59,7 +63,7 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
 
 WORKDIR /run
 
-COPY --from=network-builder /app/target/release/network-scheduler /usr/local/bin/network-scheduler
+COPY --from=network-builder /app/target/x86_64-unknown-linux-musl/release/network-scheduler /usr/local/bin/network-scheduler
 COPY --from=network-builder /app/crates/network-scheduler/config.yml .
 
 ENV P2P_LISTEN_ADDRS="/ip4/0.0.0.0/udp/12345/quic-v1"
@@ -72,9 +76,9 @@ COPY crates/network-scheduler/healthcheck.sh .
 RUN chmod +x ./healthcheck.sh
 HEALTHCHECK --interval=5s CMD ./healthcheck.sh
 
-FROM --platform=$BUILDPLATFORM network-base as logs-collector
+FROM --platform=$BUILDPLATFORM network-base AS logs-collector
 
-COPY --from=network-builder /app/target/release/logs-collector /usr/local/bin/logs-collector
+COPY --from=network-builder /app/target/x86_64-unknown-linux-musl/release/logs-collector /usr/local/bin/logs-collector
 
 ENV P2P_LISTEN_ADDRS="/ip4/0.0.0.0/udp/12345/quic-v1"
 ENV BOOTSTRAP="true"

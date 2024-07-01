@@ -1,13 +1,13 @@
 [package]
 name = "network-scheduler"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2021"
 
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
-aws-config = { version = "1", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1"
+aws-config = { version = "1", features = ["behavior-version-latest", "rustls"] }
+aws-sdk-s3 = { version = "1", features = ["rustls"] }
 axum = { version = "0.7", features = ["json"] }
 base64 = "0.22.1"
 clap = { version = "4", features = ["derive", "env"] }
