@@ -19,8 +19,9 @@ async fn update_datasets(controller: &Arc<Controller>, datasets: &Vec<Dataset>) 
                 .and_then(|height| u32::try_from(height).ok().map(|height| height + 1))
                 .unwrap_or(dataset.start_block().unwrap_or(0));
 
-            let chunks = match dataset.storage().get_chunks(next_block).await {
-                Ok(chunks) => {
+            let fut = dataset.storage().get_chunks(next_block);
+            let chunks = match tokio::time::timeout(Duration::from_secs(60), fut).await {
+                Ok(Ok(chunks)) => {
                     info!("found new chunks in {}: {:?}", dataset.url(), chunks);
                     if let Some(chunk) = chunks.last() {
                         DATASET_HEIGHT
@@ -29,11 +30,16 @@ async fn update_datasets(controller: &Arc<Controller>, datasets: &Vec<Dataset>) 
                     }
                     chunks
                 },
-                Err(err) => {
+                Ok(Err(err)) => {
                     error!("failed to download new chunks for {}: {:?}", dataset.url(), err);
                     DATASET_SYNC_ERRORS.with_label_values(&[dataset.url()]).inc();
                     return
-                }
+                },
+                Err(_) => {
+                    error!("failed to download new chunks for {}: timeout", dataset.url());
+                    DATASET_SYNC_ERRORS.with_label_values(&[dataset.url()]).inc();
+                    return
+                },
             };
 
             if let Err(err) = controller.update_dataset(dataset.url(), chunks) {
